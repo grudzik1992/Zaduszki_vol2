@@ -3474,6 +3474,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const NOTATION_KEY = 'songbook-notation';
+    const NODEFILTER_TEXT = (typeof NodeFilter === 'object' && NodeFilter?.SHOW_TEXT) || 4;
     const NOTE_COUNT = 12;
     const NOTE_INDEX = {
         'C': 0, 'B#': 0, 'H#': 0,
@@ -3527,6 +3528,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
             return converted;
         });
+    }
+
+    function normalizeChordFieldDom(el){
+        if (!el) return false;
+    const walker = document.createTreeWalker(el, NODEFILTER_TEXT, null);
+        const nodes = [];
+        let node;
+        while ((node = walker.nextNode())) nodes.push(node);
+        let mutated = false;
+        nodes.forEach(textNode => {
+            const original = textNode.nodeValue ?? '';
+            const normalized = convertChordNotation(original);
+            if (normalized !== original) {
+                textNode.nodeValue = normalized;
+                mutated = true;
+            }
+        });
+        if (mutated || !el.dataset.notationPolish) {
+            el.dataset.notationPolish = '1';
+        }
+        return mutated;
     }
 
     function wrapIndex(value){
@@ -3676,13 +3698,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
         if (!target.classList.contains('chords')) return;
-        if (target.dataset.notationPolish === '1') return;
-        const current = normalizeMultiline(target.textContent || '');
-        const normalized = convertChordNotation(current);
-        if (current !== normalized) {
-            target.textContent = normalized;
-        }
-        target.dataset.notationPolish = '1';
+        normalizeChordFieldDom(target);
     }, true);
 
   // === Hamburger menu toggle ===
@@ -3974,17 +3990,8 @@ document.addEventListener('DOMContentLoaded', () => {
             lvlEl.textContent = level > 0 ? `+${level}` : String(level);
             $$('.chords', song).forEach(el => {
                 if (!el.dataset.original) {
-                    const raw = normalizeMultiline(el.textContent || '');
-                    if (el.dataset.notationPolish === '1') {
-                        el.dataset.original = raw;
-                    } else {
-                        const normalizedRaw = convertChordNotation(raw);
-                        if (normalizedRaw !== raw) {
-                            el.textContent = normalizedRaw;
-                        }
-                        el.dataset.original = normalizedRaw;
-                        el.dataset.notationPolish = '1';
-                    }
+                    normalizeChordFieldDom(el);
+                    el.dataset.original = normalizeMultiline(el.textContent || '');
                 }
                 const orig = el.dataset.original || '';
                                 const transposed = orig.replace(CHORD_TOKEN_REGEX, c => transposeChord(c, level));
